@@ -1,5 +1,6 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
 import { getAuth, Auth, GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, User } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "mock-api-key",
@@ -22,12 +23,16 @@ if (!getApps().length) {
 const auth: Auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 
+// Get Firestore instance
+const db = getFirestore(app);
+
 // If we are using mock credentials, we can intercept calls in the AuthContext to simulate login
 export const isMockFirebase = firebaseConfig.apiKey === "mock-api-key";
 
 export {
   app,
   auth,
+  db,
   googleProvider,
   signInWithPopup,
   signInWithEmailAndPassword,

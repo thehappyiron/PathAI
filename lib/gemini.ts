@@ -398,7 +398,7 @@ export async function analyzeMarksheetImage(
 
   if (!response.ok) {
     const errText = await response.text().catch(() => "");
-    throw new Error(`Grok Vision API ${response.status}: ${errText || response.statusText}`);
+    throw new Error(`Groq Vision API ${response.status}: ${errText || response.statusText}`);
   }
 
   const data = await response.json();

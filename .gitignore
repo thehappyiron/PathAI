@@ -15,10 +15,18 @@
 
 # production
 /build
+/dist
+/out
 
 # misc
 .DS_Store
 *.pem
+*.mp4
+*.mov
+*.webm
+*.glb
+*.gltf
+*.bin
 
 # debug
 npm-debug.log*

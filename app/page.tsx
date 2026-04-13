@@ -4,6 +4,7 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { motion, Variants } from "framer-motion";
 import { Brain, Route, RefreshCw } from "lucide-react";
+import HeroProgressTracker from "@/components/analysis/HeroProgressTracker";
 
 /* ─────────────── animation variants ─────────────── */
 const stagger: Variants = {
@@ -102,7 +103,7 @@ export default function LandingPage() {
               <motion.div
                 variants={fadeUp}
                 className="flex items-center flex-wrap gap-y-4"
-                style={{ marginTop: "48px" }}
+                style={{ marginTop: "48px", gap: "12px" }}
               >
                 <button
                   onClick={goAnalyze}
@@ -123,13 +124,35 @@ export default function LandingPage() {
                   Analyze My Performance →
                 </button>
 
+                <button
+                  onClick={() => router.push("/learn")}
+                  className="font-body font-semibold rounded-pill cursor-pointer transition-all duration-300"
+                  style={{
+                    fontSize: "16px",
+                    padding: "16px 36px",
+                    background: "#0D0D0D",
+                    color: "#F5F2ED",
+                    border: "none",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "#1a1a1a";
+                    e.currentTarget.style.boxShadow = "0 4px 24px rgba(0,0,0,0.15)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "#0D0D0D";
+                    e.currentTarget.style.boxShadow = "none";
+                  }}
+                >
+                  📚 Learn →
+                </button>
+
                 <a
                   href="#features"
                   className="font-body transition-colors duration-200"
                   style={{
                     fontSize: "15px",
                     color: "var(--ink-muted)",
-                    marginLeft: "24px",
+                    marginLeft: "12px",
                     textDecoration: "none",
                   }}
                   onMouseEnter={(e) =>
@@ -173,120 +196,14 @@ export default function LandingPage() {
               </motion.div>
             </motion.div>
 
-            {/* ── RIGHT COLUMN — decorative score card (desktop) ── */}
+            {/* ── RIGHT COLUMN — interactive tracker (desktop) ── */}
             <motion.div
-              className="lg:col-span-2 hidden lg:block"
+              className="lg:col-span-2 w-full mt-10 lg:mt-0"
               initial={{ opacity: 0, x: 40 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.7, delay: 0.35, ease: "easeOut" }}
             >
-              <div
-                style={{
-                  background: "#FFFFFF",
-                  borderRadius: "20px",
-                  boxShadow: "0 8px 40px rgba(0,0,0,0.08)",
-                  padding: "36px 32px",
-                  border: "1px solid #E8E5DF",
-                }}
-              >
-                {/* card heading */}
-                <h3
-                  className="font-body"
-                  style={{
-                    fontSize: "18px",
-                    fontWeight: 600,
-                    color: "var(--ink)",
-                    marginBottom: "28px",
-                  }}
-                >
-                  Mathematics
-                </h3>
-
-                {/* topic rows */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-                  {mockTopics.map((topic, i) => (
-                    <div key={topic.name}>
-                      <div
-                        className="flex items-center justify-between"
-                        style={{ marginBottom: "8px" }}
-                      >
-                        <span
-                          className="font-body"
-                          style={{
-                            fontSize: "14px",
-                            fontWeight: 500,
-                            color: "var(--ink)",
-                          }}
-                        >
-                          {topic.name}
-                        </span>
-                        <span
-                          className="font-mono"
-                          style={{
-                            fontSize: "14px",
-                            fontWeight: 500,
-                            color: topic.color,
-                          }}
-                        >
-                          {topic.score}%
-                        </span>
-                      </div>
-                      {/* progress track */}
-                      <div
-                        style={{
-                          width: "100%",
-                          height: "8px",
-                          borderRadius: "999px",
-                          background: `${topic.color}15`,
-                        }}
-                      >
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${topic.score}%` }}
-                          transition={{
-                            duration: 0.8,
-                            delay: 0.6 + i * 0.15,
-                            ease: "easeOut",
-                          }}
-                          style={{
-                            height: "100%",
-                            borderRadius: "999px",
-                            background: topic.color,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* weak area chip */}
-                <div
-                  style={{
-                    marginTop: "24px",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    background: "rgba(155,35,53,0.08)",
-                    color: "#9B2335",
-                    fontSize: "12px",
-                    fontWeight: 500,
-                    borderRadius: "999px",
-                    padding: "6px 14px",
-                  }}
-                  className="font-body"
-                >
-                  <span
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: "50%",
-                      background: "#9B2335",
-                      display: "inline-block",
-                    }}
-                  />
-                  Weak area detected: Geometry
-                </div>
-              </div>
+              <HeroProgressTracker />
             </motion.div>
           </div>
         </div>

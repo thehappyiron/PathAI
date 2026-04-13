@@ -7,7 +7,9 @@ import { ArrowLeft, Check, Plus, X } from "lucide-react";
 import { subjects } from "@/data/subjects";
 import { analyzePerformance, comparePerformance } from "@/lib/gemini";
 import { saveSession, getPreviousSession } from "@/lib/storage";
-import { StudentInput, TopicScore } from "@/lib/types";
+import { saveSessionToCloud } from "@/lib/firebase_service";
+import { StudentInput, TopicScore, SessionPayload } from "@/lib/types";
+import { useAuth } from "@/lib/AuthContext";
 import TargetCursor from "@/components/ui/TargetCursor";
 
 /* ───────── constants ───────── */
@@ -40,6 +42,7 @@ function AnalyzeInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isRetake = searchParams.get("mode") === "retake";
+  const { user } = useAuth();
 
   /* previous session for retake */
   const prevSession = isRetake ? getPreviousSession() : null;
@@ -166,9 +169,15 @@ function AnalyzeInner() {
       if (isRetake && prevInput) {
         const compResult = await comparePerformance(prevInput, currentInput);
         saveSession(currentInput, compResult.updatedPlan, compResult);
+        // Persist to history immediately
+        const payload: SessionPayload = { input: currentInput, result: compResult.updatedPlan, comparison: compResult, timestamp: Date.now() };
+        if (user) saveSessionToCloud(user.uid, payload).catch(() => {});
       } else {
         const result = await analyzePerformance(currentInput);
         saveSession(currentInput, result);
+        // Persist to history immediately
+        const payload: SessionPayload = { input: currentInput, result, timestamp: Date.now() };
+        if (user) saveSessionToCloud(user.uid, payload).catch(() => {});
       }
 
       router.push("/results");

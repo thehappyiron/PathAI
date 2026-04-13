@@ -11,7 +11,10 @@ import { ExternalLink, Clock, ChevronDown } from "lucide-react";
 import ChatBot from "@/components/analysis/ChatBot";
 import RadarChart3D from "@/components/analysis/RadarChart3D";
 import { getCurrentSession, archiveSession } from "@/lib/storage";
-import { StudentInput, AnalysisResult, ComparisonResult, Resource } from "@/lib/types";
+import { StudentInput, AnalysisResult, ComparisonResult, Resource, SessionPayload } from "@/lib/types";
+import { useAuth } from "@/lib/AuthContext";
+import { saveSessionToCloud } from "@/lib/firebase_service";
+import { CheckCircle } from "lucide-react";
 
 /* ─── helpers ─── */
 const clr = (pct: number) =>
@@ -38,6 +41,46 @@ export default function ResultsPage() {
   const [resFilter, setResFilter] = useState<ResourceFilter>("All");
   const [diffFilter, setDiffFilter] = useState<DifficultyFilter>("All");
   const [expandedQ, setExpandedQ] = useState<number | null>(null);
+  const { user } = useAuth();
+  const [isSynced, setIsSynced] = useState(false);
+  const [sessionData, setSessionData] = useState<SessionPayload | null>(null);
+
+  /* ── Day completion state (persisted) ── */
+  const [completedDays, setCompletedDays] = useState<Set<number>>(() => {
+    if (typeof window === "undefined") return new Set<number>();
+    try {
+      const saved = localStorage.getItem("pathai_completed_days");
+      return saved ? new Set(JSON.parse(saved)) : new Set<number>();
+    } catch { return new Set<number>(); }
+  });
+  const [sendingDay, setSendingDay] = useState<number | null>(null);
+
+  const handleDayComplete = async (dayIndex: number, dayName: string, focus: string) => {
+    if (completedDays.has(dayIndex)) return;
+    setSendingDay(dayIndex);
+
+    try {
+      await fetch("/api/send-congrats", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: user?.email || "",
+          displayName: user?.displayName || "Learner",
+          dayName,
+          dayNumber: dayIndex + 1,
+          focus,
+        }),
+      });
+    } catch (e) {
+      console.error("Congrats email error:", e);
+    }
+
+    const updated = new Set(completedDays);
+    updated.add(dayIndex);
+    setCompletedDays(updated);
+    localStorage.setItem("pathai_completed_days", JSON.stringify(Array.from(updated)));
+    setSendingDay(null);
+  };
 
   useEffect(() => {
     const session = getCurrentSession();
@@ -45,10 +88,21 @@ export default function ResultsPage() {
       router.push("/analyze");
       return;
     }
+    setSessionData(session);
     setInput(session.input);
     setResult(session.result);
     if (session.comparison) setComparison(session.comparison);
   }, [router]);
+
+  useEffect(() => {
+    if (user && sessionData && !isSynced) {
+      const sync = async () => {
+        const docId = await saveSessionToCloud(user.uid, sessionData);
+        if (docId) setIsSynced(true);
+      };
+      sync();
+    }
+  }, [user, sessionData, isSynced]);
 
   if (!input || !result) {
     return (
@@ -169,9 +223,23 @@ export default function ResultsPage() {
             <h1 style={{ fontFamily: "'DM Serif Display',serif", fontSize: 42, color: "#0D0D0D", lineHeight: 1.1, margin: 0 }}>
               Your learning path is ready.
             </h1>
-            <p style={{ fontFamily: "'Outfit',sans-serif", fontSize: 17, color: "#52514E", maxWidth: 560, marginTop: 12, lineHeight: 1.65 }}>
-              {result.overallAssessment}
-            </p>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12 }}>
+                <p style={{ fontFamily: "'Outfit',sans-serif", fontSize: 17, color: "#52514E", maxWidth: 560, margin: 0, lineHeight: 1.65 }}>
+                {result.overallAssessment}
+                </p>
+                {isSynced && (
+                    <div style={{ 
+                        display: "flex", alignItems: "center", gap: 5, 
+                        background: "rgba(45,106,79,0.08)", border: "1px solid rgba(45,106,79,0.2)",
+                        padding: "4px 10px", borderRadius: "999px", flexShrink: 0,
+                        animation: "fadeIn 0.5s ease-out"
+                    }}>
+                        <CheckCircle size={12} color="#2D6A4F" />
+                        <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 11, fontWeight: 600, color: "#2D6A4F", textTransform: "uppercase" }}>Synced</span>
+                    </div>
+                )}
+            </div>
+            <style>{`@keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }`}</style>
           </div>
 
           {/* score card */}
@@ -407,40 +475,74 @@ export default function ResultsPage() {
         <motion.div {...section(0.16)} style={{ marginBottom: 32 }}>
           <h2 style={{ fontFamily: "'DM Serif Display',serif", fontSize: 32, color: "#0D0D0D", margin: "0 0 24px" }}>Your 7-day study plan</h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 14 }}>
-            {result.weeklyPlan.map((day, i) => (
-              <div key={i} style={{
-                background: "#fff", borderRadius: 14, padding: 20,
-                border: "1px solid rgba(13,13,13,0.10)",
-                display: "flex", flexDirection: "column", gap: 10,
-              }}>
-                <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: "#9E9B95", textTransform: "uppercase" }}>Day {i + 1}</div>
-                <div style={{ fontFamily: "'Outfit',sans-serif", fontSize: 15, fontWeight: 700, color: "#0D0D0D" }}>{day.day.replace(/Day \d+ \(|\)/g, "")}</div>
-                <span style={{
-                  display: "inline-block", fontFamily: "'Outfit',sans-serif", fontSize: 12,
-                  color: "#C9A84C", background: "rgba(201,168,76,0.10)",
-                  borderRadius: 999, padding: "3px 10px", alignSelf: "flex-start",
-                }}>{day.focus}</span>
-                <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-                  {day.tasks.map((task, j) => (
-                    <li key={j} style={{
-                      fontFamily: "'Outfit',sans-serif", fontSize: 13, color: "#52514E",
-                      lineHeight: 1.6, display: "flex", gap: 6,
-                    }}>
-                      <span style={{ color: "#C9A84C", flexShrink: 0 }}>•</span>
-                      {task}
-                    </li>
-                  ))}
-                </ul>
-                <div style={{
-                  display: "flex", alignItems: "center", gap: 4, marginTop: "auto",
-                  fontFamily: "'JetBrains Mono',monospace", fontSize: 13, color: "#9E9B95",
+            {result.weeklyPlan.map((day, i) => {
+              const isCompleted = completedDays.has(i);
+              const isSending = sendingDay === i;
+              return (
+                <div key={i} style={{
+                  background: isCompleted ? "rgba(45,106,79,0.04)" : "#fff",
+                  borderRadius: 14, padding: 20,
+                  border: isCompleted ? "1px solid rgba(45,106,79,0.25)" : "1px solid rgba(13,13,13,0.10)",
+                  display: "flex", flexDirection: "column", gap: 10,
+                  transition: "all 0.3s",
                 }}>
-                  <Clock style={{ width: 13, height: 13 }} />
-                  {day.estimatedTime}
+                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: "#9E9B95", textTransform: "uppercase" }}>Day {i + 1}</div>
+                  <div style={{ fontFamily: "'Outfit',sans-serif", fontSize: 15, fontWeight: 700, color: "#0D0D0D" }}>{day.day.replace(/Day \d+ \(|\)/g, "")}</div>
+                  <span style={{
+                    display: "inline-block", fontFamily: "'Outfit',sans-serif", fontSize: 12,
+                    color: "#C9A84C", background: "rgba(201,168,76,0.10)",
+                    borderRadius: 999, padding: "3px 10px", alignSelf: "flex-start",
+                  }}>{day.focus}</span>
+                  <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                    {day.tasks.map((task, j) => (
+                      <li key={j} style={{
+                        fontFamily: "'Outfit',sans-serif", fontSize: 13, color: "#52514E",
+                        lineHeight: 1.6, display: "flex", gap: 6,
+                      }}>
+                        <span style={{ color: "#C9A84C", flexShrink: 0 }}>•</span>
+                        {task}
+                      </li>
+                    ))}
+                  </ul>
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 4, marginTop: "auto",
+                    fontFamily: "'JetBrains Mono',monospace", fontSize: 13, color: "#9E9B95",
+                  }}>
+                    <Clock style={{ width: 13, height: 13 }} />
+                    {day.estimatedTime}
+                  </div>
+
+                  {/* ── Tick Checkbox ── */}
+                  <button
+                    disabled={isCompleted || isSending}
+                    onClick={() => handleDayComplete(i, day.day.replace(/Day \d+ \(|\)/g, ""), day.focus)}
+                    style={{
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                      marginTop: 8, width: "100%",
+                      padding: "10px 12px", borderRadius: 10,
+                      border: isCompleted ? "1px solid rgba(45,106,79,0.25)" : "1px dashed rgba(13,13,13,0.15)",
+                      background: isCompleted ? "rgba(45,106,79,0.08)" : "transparent",
+                      cursor: isCompleted ? "default" : "pointer",
+                      fontFamily: "'Outfit',sans-serif", fontSize: 13, fontWeight: 600,
+                      color: isCompleted ? "#2D6A4F" : "#9E9B95",
+                      transition: "all 0.3s",
+                    }}
+                    onMouseEnter={e => { if (!isCompleted) { e.currentTarget.style.borderColor = "#2D6A4F"; e.currentTarget.style.color = "#2D6A4F"; e.currentTarget.style.background = "rgba(45,106,79,0.04)"; } }}
+                    onMouseLeave={e => { if (!isCompleted) { e.currentTarget.style.borderColor = "rgba(13,13,13,0.15)"; e.currentTarget.style.color = "#9E9B95"; e.currentTarget.style.background = "transparent"; } }}
+                  >
+                    {isSending ? (
+                      <><span style={{ animation: "spin 1s linear infinite", display: "inline-block" }}>⏳</span> Sending...</>
+                    ) : isCompleted ? (
+                      <><CheckCircle size={15} /> Completed ✓</>
+                    ) : (
+                      <><span style={{ width: 15, height: 15, borderRadius: 4, border: "2px solid currentColor", display: "inline-block" }} /> Mark as done</>
+                    )}
+                  </button>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
+          <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
         </motion.div>
 
         {/* ═══ ROW 8: MOTIVATIONAL CTA ═══ */}
